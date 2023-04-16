@@ -1,5 +1,9 @@
 import random
 
+import db
+from db import *
+
+
 def getDeckOfCards():
     deckOfCards = []
     suits = ["\u2665", "\u2666", "\u2660", "\u2663"]
@@ -19,10 +23,14 @@ def getDeckOfCards():
 
 def getValueOfHand(hand):
     value = 0
-    #if len(hand) == 1:
-    #    value = hand[2]
+    aceCount = 0
     for card in hand:
         value += card[2]
+        if card[2] == 11:
+            aceCount += 1
+    while value > 21 and aceCount > 0:
+        value -= 10
+        aceCount -= 1
     return value
 
 
@@ -32,8 +40,39 @@ def getRandomCard(deck_of_cards):
     return dealtCard, deck_of_cards
 
 
+def getBetAmount():
+    money = db.show_players_money()
+    try:
+        betAmount = float(input("How much would you like to bet: "))
+        if betAmount > money or betAmount < 5 or betAmount > 1000:
+            raise ValueError
+        if type(betAmount) not in [float, int]:
+            raise TypeError
+    except ValueError:
+        print("Bet amount can not be greater than Player's money. Please try again")
+    except TypeError:
+        print("Bet amount must be an valid integer")
+    else:
+        return betAmount
+
+
+def updatePlayersMoney(updateAmount):
+    playerMoney = show_players_money()
+    playerMoney += updateAmount
+    update_money(playerMoney)
+
+
+def checkIfBlackjack(hand):
+    if len(hand) > 2:
+        return False
+    if "Ace" in hand[0] or "Ace" in hand[1]:
+        if getValueOfHand(hand) == 21:
+            return True
+    return False
+
+
 def main():
-    print("BLACKJACK!")
+    print("Let's Play BLACKJACK!")
     print("Blackjack payout is 3:2")
     print()
 
@@ -41,11 +80,31 @@ def main():
         deck = getDeckOfCards()
         dealerHand = []
         playerHand = []
+
+        playersMoney = db.show_players_money()
+        print(f"You have ${playersMoney} in your pot")
+
+        betAmount = getBetAmount()
+        updateAmount = -1 * betAmount
+
         card, deck = getRandomCard(deck)
         dealerHand.append(card)
+        card, deck = getRandomCard(deck)
+        dealerHand.append(card)
+
         print("DEALER'S SHOW CARD: ")
         print(f"{dealerHand[0][1]} of {dealerHand[0][0]}")
         print()
+
+        if checkIfBlackjack(dealerHand) == True:
+            print("Dealer has Blackjack!")
+            updatePlayersMoney(updateAmount)
+            again = input("Play again? (y/n)")
+            if again.lower() != "y":
+                break
+            else:
+                continue
+
         card, deck = getRandomCard(deck)
         playerHand.append(card)
         card, deck = getRandomCard(deck)
@@ -54,6 +113,17 @@ def main():
         print(f"{playerHand[0][1]} of {playerHand[0][0]}")
         print(f"{playerHand[1][1]} of {playerHand[1][0]}")
         print()
+
+        if checkIfBlackjack(playerHand) == True:
+            print("Blackjack! You won!")
+            updateAmount = betAmount * 1.5
+            updatePlayersMoney(updateAmount)
+
+            again = input("Play again? (y/n)")
+            if again.lower() != "y":
+                break
+            else:
+                continue
 
         while getValueOfHand(playerHand) <= 21:
             playerChoice = input("Would you like to hit or stand: ").lower()
@@ -71,7 +141,13 @@ def main():
         if getValueOfHand(playerHand) > 21:
             print("You bust")
             print()
-            continue
+            updatePlayersMoney(updateAmount)
+
+            again = input("Play again? (y/n)")
+            if again.lower() != "y":
+                break
+            else:
+                continue
 
         while getValueOfHand(dealerHand) < getValueOfHand(playerHand) and getValueOfHand(dealerHand) < 17:
             card, deck = getRandomCard(deck)
@@ -83,25 +159,35 @@ def main():
         if getValueOfHand(dealerHand) > 21:
             print("Dealer busts. You Win!")
             print()
+            updateAmount = betAmount
+            updatePlayersMoney(updateAmount)
 
-            #To Do  pay double bet
-            continue
+            again = input("Play again? (y/n)")
+            if again.lower() != "y":
+                break
+            else:
+                continue
 
         if getValueOfHand(playerHand) == getValueOfHand(dealerHand):
             print("Push")
             print()
-            #To Do return bet amount
+            updateAmount = 0
         elif getValueOfHand(playerHand) > getValueOfHand(dealerHand):
             print("You Win")
             print()
-            #To Do pay double bet
+            updateAmount = betAmount
         elif getValueOfHand(dealerHand) > getValueOfHand(playerHand):
             print("Dealer Wins")
             print()
 
-        again = ("Play again? (y/n)")
+        updatePlayersMoney(updateAmount)
+
+        again = input("Play again? (y/n)")
         if again.lower() != "y":
             break
+
+    print("Thanks for playing")
+
 
 if __name__ == "__main__":
     main()
